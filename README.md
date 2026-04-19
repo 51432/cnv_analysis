@@ -1,115 +1,155 @@
-# CNVkit WES CNV Pipeline（阶段一）
+# CNVkit WES Pipeline（Slurm）
 
-本项目当前实现 **阶段一：构建 pooled normal 的 CNVkit reference（CNVKIT_REFERENCE）**，使用 Slurm 调度并支持并行计算 normal coverage。
+当前项目包含两个阶段：
 
-## 已实现阶段
+1. **阶段一（已完成）**：构建 pooled normal `wes_reference.cnn`
+2. **阶段二（本次新增）**：对每个 tumor 样本进行 CNVkit 后续分析（coverage → fix → segment → 可选 filtering/call/reports）
 
-- `--stage build-reference`：已实现。
-- `--stage run-cnv`：仅预留接口，暂未实现（阶段二）。
+---
 
-## 输入格式
+## 输入格式（固定）
 
-`samples.tsv` 必须为 **TAB 分隔**，且表头必须严格为：
+`samples.tsv` 必须是 TAB 分隔，且表头严格为：
 
 ```tsv
 sample_id	tumor_bam	normal_bam
 ```
 
-说明：
-- 阶段一仅使用 `sample_id` 与 `normal_bam` 构建 reference。
-- 但会严格校验 `tumor_bam` 与 `normal_bam` 均存在且可读。
+校验规则：
+- `sample_id` 唯一
+- `tumor_bam` / `normal_bam` 必须存在且可读
+- `tumor_bam` 与 `normal_bam` 不能相同
 
-## 快速开始
+错误格式统一：
+
+```text
+[ERROR] line=<行号> sample_id=<ID> message=<原因>
+```
+
+---
+
+## 阶段一：build reference
+
+入口脚本：`01_submit_cnvkit_pipeline.sh`
+
+> 可直接使用现成 reference：
+> `/data/person/wup/public/liusy_files/reference_genomes/hg38/resources/cnvkit/wes_reference.cnn`
+
+---
+
+## 阶段二：tumor CNV 分析（新增）
+
+入口脚本：`03_submit_cnvkit_tumor_array.sh`
+
+### 主链步骤
+
+每个样本（一个 Slurm array task）按需执行：
+
+1. tumor `targetcoverage`
+2. tumor `antitargetcoverage`
+3. `fix`（使用 `wes_reference.cnn`）
+4. `segment`
+
+### 可选增强步骤（开关控制）
+
+- `segmetrics --ci`
+- `call --filter ci`
+- `genemetrics`
+- `export seg`
+- `export bed`
+- `export vcf`
+- `scatter`
+- `diagram`
+
+默认开启 filtering/genemetrics/export/plots，可通过 CLI 关闭。
+
+---
+
+## 阶段控制
+
+`--stage` 支持：
+- `coverage`
+- `fix`
+- `segment`
+- `call`
+- `reports`
+- `all`
+
+说明：
+- `fix` 会自动依赖并复用/生成 coverage
+- `segment` 会自动依赖 fix
+- `call` 会自动依赖 segment
+- `reports` 会自动依赖 call
+
+---
+
+## 输出结构（每个样本）
+
+根目录：`<output_root>/samples/<sample_id>/`
+
+- `coverage/`
+  - `<sample>.targetcoverage.cnn`
+  - `<sample>.antitargetcoverage.cnn`
+- `cnr/`
+  - `<sample>.cnr`
+- `cns/`
+  - `<sample>.seg.cns`
+- `call/`
+  - `<sample>.call.cns`（启用 filtering 时）
+- `metrics/`
+  - `<sample>.segmetrics.cns`
+  - `<sample>.genemetrics.tsv`
+- `export/`
+  - `<sample>.seg`
+  - `<sample>.bed`
+  - `<sample>.vcf`
+- `plots/`
+  - `<sample>.scatter.pdf`
+  - `<sample>.diagram.pdf`
+
+---
+
+## 最小运行示例
+
+### 只跑主链到 segment
 
 ```bash
-bash 01_submit_cnvkit_pipeline.sh \
-  --samples /path/to/samples.tsv \
-  --stage build-reference \
-  --mode wes \
-  --threads 8 \
+bash 03_submit_cnvkit_tumor_array.sh \
+  --samples samples.tsv \
+  --stage segment \
+  --reference-cnn /data/person/wup/public/liusy_files/reference_genomes/hg38/resources/cnvkit/wes_reference.cnn \
   --max-parallel 8
 ```
 
-可选参数：
-- `--reference-out`：指定 reference 输出路径。
-- `--workdir`：指定中间目录与日志目录。
-- `--overwrite-reference`：如果 reference 已存在则强制重建（并清理已有 `.cnn` 与 BED 缓存后重跑）。
-- `--partition` / `SLURM_PARTITION`：仅允许 `cpu1` 或 `cpu2`，默认 `cpu1`。
-
-## 阶段一执行顺序
-
-1. `01_submit_cnvkit_pipeline.sh`
-   - 校验 `samples.tsv`
-   - 去重 `normal_bam`
-   - 提交 Slurm array（并行 coverage）
-   - 提交依赖 array 的 pooled reference 汇总任务
-2. `run_cnvkit_reference_array.sbatch`
-   - 根据数组索引取 1 个 unique normal BAM
-   - 调用单任务脚本
-3. `02_run_cnvkit_reference_task.sh`
-   - 先将 target BED 规范化为 BED3（仅前3列）
-   - 生成 antitarget BED（存在则跳过），再规范化为 BED3
-   - 计算 target/antitarget coverage（存在则跳过）
-4. `02_build_cnvkit_reference.sh`
-   - 汇总所有 coverage `.cnn` 文件生成 pooled reference
-
-## 关键 CNVkit 子命令
-
-> 说明：为避免部分环境下 `samtools bedcov` 解析导致 `ParserError`，脚本默认使用 `cnvkit.py coverage --count -p 1`；并发主要通过 Slurm array (`--max-parallel`) 实现。
-
-- `cnvkit.py antitarget`
-- `cnvkit.py coverage`
-- `cnvkit.py reference`
-
-## 目录结构
-
-- `config/00_config.sh`：统一管理 hg38 资源与默认参数（含 `CNVKIT_COVERAGE_USE_COUNT=1`）
-- `lib/validate_samples_tsv.sh`：严格校验输入 TSV
-- `lib/steps_cnvkit.sh`：封装 CNVkit 阶段一核心步骤
-- `01_submit_cnvkit_pipeline.sh`：阶段入口与 Slurm 提交
-- `run_cnvkit_reference_array.sbatch`：数组任务包装
-- `02_run_cnvkit_reference_task.sh`：单个 normal coverage 任务
-- `02_build_cnvkit_reference.sh`：pooled reference 汇总任务
-
-## 日志与中间文件
-
-默认位于：
-- `./work/cnvkit/meta/`：校验后样本表、去重 normal 列表、antitarget BED
-- `./work/cnvkit/coverage/`：每个 normal 的 `.targetcoverage.cnn` 与 `.antitargetcoverage.cnn`
-- `./logs/`：Slurm array 与汇总任务日志（建立在当前目录）
-
-## 常见问题
-
-### `DependencyNeverSatisfied` 是什么？
-
-如果你看到 build job（`cnvkit_ref_build`）处于 `PD (DependencyNeverSatisfied)`，表示它依赖的 coverage array job 没有全部成功（某些 task 失败或被取消）。
-
-建议排查：
+### 全流程（含 filtering + reports）
 
 ```bash
-sacct -j <array_jobid> --format=JobID,State,ExitCode
+bash 03_submit_cnvkit_tumor_array.sh \
+  --samples samples.tsv \
+  --stage all \
+  --reference-cnn /data/person/wup/public/liusy_files/reference_genomes/hg38/resources/cnvkit/wes_reference.cnn \
+  --max-parallel 8
 ```
 
-再查看对应日志：
+---
 
-- `logs/cov_<array_jobid>_<taskid>.err`
-- `logs/cov_<array_jobid>_<taskid>.out`
+## 推荐执行方案
 
-当前脚本已对 build job 使用 `--kill-on-invalid-dep=yes`，依赖无效时会自动取消，避免一直挂在队列中。
+1. 先跑：`--stage segment`（先得到稳定主链结果）
+2. 再跑：`--stage all` 或 `--stage reports`（启用 filtering/call/reports）
+3. 对比：
+   - 原始分段：`cns/<sample>.seg.cns`
+   - 过滤后推荐结果：`call/<sample>.call.cns`
 
+---
 
-### `ParserError: expected 5 and found 4` 是什么？
+## 关键配置（config/00_config.sh）
 
-这通常是 BED 列数不一致导致（例如目标区间文件中混有 3/4 列），CNVkit 在并行 coverage 解析时会报错。
-
-当前脚本会在任务开始时把 target/antitarget 统一规范成 BED3（仅 chrom/start/end 三列），以避免该问题。
-
-### `config/00_config.sh: No such file or directory`（build job）
-
-如果 `build_*.err` 出现类似：
-
-```text
-/var/spool/slurmd/jobXXXX/slurm_script: ... config/00_config.sh: No such file or directory
-```
-
-说明 Slurm 在 spool 目录执行脚本，不能依赖脚本自身相对路径。当前版本已优先使用提交时导出的 `SCRIPT_DIR` 来定位项目目录。
+统一管理：
+- `CNVKIT_REFERENCE_DEFAULT`
+- `CNVKIT_TARGET_BED`
+- `CNVKIT_ACCESS_BED`
+- `REFERENCE`
+- `CNVKIT_CMD`
+- 输出/日志/tmp 默认目录
+- 可选步骤开关默认值

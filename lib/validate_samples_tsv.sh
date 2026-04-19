@@ -71,6 +71,11 @@ while IFS= read -r raw_line || [[ -n "$raw_line" ]]; do
     ((error_count += 1))
   fi
 
+  if [[ "$tumor_bam" == "$normal_bam" ]]; then
+    echo "[ERROR] line=${line_no} sample_id=${sample_id} message=tumor_bam and normal_bam must be different" >&2
+    ((error_count += 1))
+  fi
+
   echo -e "${sample_id}\t${tumor_bam}\t${normal_bam}" >> "$tmp_out"
 done < <(tail -n +2 "$samples_tsv")
 

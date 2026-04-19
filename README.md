@@ -169,3 +169,89 @@ bash 03_submit_cnvkit_tumor_array.sh \
 - `CNVKIT_CMD`
 - 输出/日志/tmp 默认目录
 - 可选步骤开关默认值
+
+---
+
+## 阶段三：分组统计与自动出图（新增 downstream）
+
+### 文件结构
+
+```text
+05_run_cnvkit_group_downstream.sh
+scripts/
+  cnvkit_group_downstream.py
+```
+
+### 每个脚本职责
+
+- `05_run_cnvkit_group_downstream.sh`
+  - 命令行入口；校验输入目录与 `group.tsv`
+  - 统一组装参数并调用 Python 主脚本
+  - 约定默认输出目录：`<cnvkit-root>/downstream/group_stats`
+- `scripts/cnvkit_group_downstream.py`
+  - 自动识别 `group.tsv` 是 2 组还是 3 组
+  - 汇总 sample-level CNV burden 指标
+  - 构建 gene-level CNV matrix（loss=-1, neutral=0, gain=1）
+  - 进行 burden / gene-level / arm-level 频率统计比较（含 BH 校正 q 值）
+  - 自动输出固定命名的 PDF 图与 TSV 结果表
+
+### 输入说明
+
+1. `--cnvkit-root`
+   - CNVkit 主流程输出根目录，内部需包含：`samples/<sample_id>/...`
+   - 脚本优先读取 `call/<sample_id>.call.cns`，若不存在则回退到 `cns/<sample_id>.seg.cns`
+2. `--group-tsv`
+   - 必须为 TAB 分隔，表头固定：
+   - `sample_id<TAB>group`
+   - 仅支持两组或三组
+
+### 输出说明（固定文件名）
+
+默认输出到：`<cnvkit-root>/downstream/group_stats/`
+
+表格：
+- `burden_metrics.tsv`
+- `burden_group_comparison.tsv`
+- `gene_cnv_matrix.tsv`
+- `gene_frequency_by_group.tsv`
+- `gene_frequency_comparison.tsv`
+- `arm_level_cnv_matrix.tsv`
+- `arm_level_frequency_comparison.tsv`
+- `run_summary.tsv`
+
+图片：
+- `burden_boxplot.pdf`
+- `gain_loss_burden_boxplot.pdf`
+- `gene_frequency_barplot_topN.pdf`
+- `gene_cnv_heatmap.pdf`
+- `arm_level_heatmap.pdf`（arm 由每条染色体的中点启发式划分 p/q）
+
+### 统计方法
+
+- 两组：
+  - burden：Wilcoxon rank-sum（`mannwhitneyu`）
+  - gene/arm 频率：Fisher's exact
+- 三组：
+  - burden：Kruskal-Wallis
+  - gene/arm 频率：卡方检验（`chi2_contingency`）
+- 所有比较均同时输出原始 `p_value` 与 BH 校正 `q_value`
+
+### 最小运行示例
+
+```bash
+bash 05_run_cnvkit_group_downstream.sh \
+  --cnvkit-root /path/to/work/cnvkit_tumor \
+  --group-tsv /path/to/group.tsv
+```
+
+可选参数示例：
+
+```bash
+bash 05_run_cnvkit_group_downstream.sh \
+  --cnvkit-root /path/to/work/cnvkit_tumor \
+  --group-tsv /path/to/group.tsv \
+  --output-dir /path/to/group_stats \
+  --top-n 40 \
+  --gain-threshold 0.25 \
+  --loss-threshold -0.25
+```

@@ -38,6 +38,7 @@ overwrite_reference=0
 slurm_partition="${SLURM_PARTITION:-${SLURM_PARTITION_DEFAULT}}"
 slurm_time="${SLURM_TIME:-${SLURM_TIME_DEFAULT}}"
 slurm_mem="${SLURM_MEM:-${SLURM_MEM_DEFAULT}}"
+annotated_target_bed="${CNVKIT_ANNOTATED_TARGET_BED}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -60,6 +61,8 @@ if [[ -z "$samples_tsv" ]]; then
   usage
   exit 1
 fi
+
+[[ -s "$annotated_target_bed" ]] || { echo "Missing annotated target BED: $annotated_target_bed" >&2; exit 1; }
 
 if [[ "$mode" != "wes" ]]; then
   echo "Only --mode wes is supported now." >&2
@@ -88,8 +91,6 @@ mkdir -p "$workdir" "$log_dir" "$workdir/meta" "$workdir/coverage"
 validated_samples="${workdir}/meta/samples.validated.tsv"
 normal_list="${workdir}/meta/normal_bams.unique.list"
 antitarget_bed="${workdir}/meta/antitarget.hg38.bed"
-target_bed3="${workdir}/meta/target.hg38.bed3"
-antitarget_bed3="${workdir}/meta/antitarget.hg38.bed3"
 
 "${script_dir}/lib/validate_samples_tsv.sh" "$samples_tsv" "$validated_samples"
 
@@ -109,8 +110,8 @@ fi
 if [[ "$overwrite_reference" -eq 1 ]]; then
   rm -f "$reference_out"
   rm -f "${workdir}/coverage"/*.cnn 2>/dev/null || true
-  rm -f "$target_bed3" "$antitarget_bed" "$antitarget_bed3"
-  echo "[INFO] overwrite mode: cleaned existing reference/coverage/meta BED cache"
+  rm -f "$antitarget_bed"
+  echo "[INFO] overwrite mode: cleaned existing reference/coverage/meta cache"
 fi
 
 array_range="0-$((normal_count - 1))%${max_parallel}"
@@ -129,7 +130,7 @@ array_job_id=$(sbatch \
   --output="${log_dir}/cov_%A_%a.out" \
   --error="${log_dir}/cov_%A_%a.err" \
   --array="$array_range" \
-  --export=ALL,SCRIPT_DIR="$script_dir",NORMAL_LIST="$normal_list",COVERAGE_DIR="${workdir}/coverage",ANTITARGET_BED="$antitarget_bed",TARGET_BED3="$target_bed3",ANTITARGET_BED3="$antitarget_bed3",THREADS="$threads" \
+  --export=ALL,SCRIPT_DIR="$script_dir",NORMAL_LIST="$normal_list",COVERAGE_DIR="${workdir}/coverage",ANNOTATED_TARGET_BED="$annotated_target_bed",ANTITARGET_BED="$antitarget_bed",THREADS="$threads" \
   "${script_dir}/run_cnvkit_reference_array.sbatch")
 
 echo "[INFO] Submitted coverage array job: ${array_job_id}"

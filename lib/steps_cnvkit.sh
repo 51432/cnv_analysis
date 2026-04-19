@@ -56,11 +56,18 @@ cnvkit_run_normal_coverage() {
     echo "[WARN] For stability, cnvkit.py coverage is forced to -p 1 (array-level parallelism is still used)."
   fi
 
+  local -a coverage_opts
+  coverage_opts=(-p 1)
+  if [[ "${CNVKIT_COVERAGE_USE_COUNT:-0}" -eq 1 ]]; then
+    coverage_opts+=(--count)
+    echo "[INFO] coverage mode: --count"
+  fi
+
   echo "[INFO] Running target coverage for: $normal_bam"
-  cnvkit.py coverage "$normal_bam" "$target_bed" -p 1 -o "$target_cnn"
+  cnvkit.py coverage "$normal_bam" "$target_bed" "${coverage_opts[@]}" -o "$target_cnn"
 
   echo "[INFO] Running antitarget coverage for: $normal_bam"
-  cnvkit.py coverage "$normal_bam" "$antitarget_bed" -p 1 -o "$antitarget_cnn"
+  cnvkit.py coverage "$normal_bam" "$antitarget_bed" "${coverage_opts[@]}" -o "$antitarget_cnn"
 }
 
 cnvkit_build_reference() {

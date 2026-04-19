@@ -55,7 +55,7 @@ bash 01_submit_cnvkit_pipeline.sh \
 
 ## 关键 CNVkit 子命令
 
-> 说明：为避免部分环境下 `cnvkit.py coverage` 并行解析 BED 出现 `ParserError`，脚本内部固定使用 `-p 1`；并发主要通过 Slurm array (`--max-parallel`) 实现。
+> 说明：为避免部分环境下 `samtools bedcov` 解析导致 `ParserError`，脚本默认使用 `cnvkit.py coverage --count -p 1`；并发主要通过 Slurm array (`--max-parallel`) 实现。
 
 - `cnvkit.py antitarget`
 - `cnvkit.py coverage`
@@ -63,7 +63,7 @@ bash 01_submit_cnvkit_pipeline.sh \
 
 ## 目录结构
 
-- `config/00_config.sh`：统一管理 hg38 资源与默认参数
+- `config/00_config.sh`：统一管理 hg38 资源与默认参数（含 `CNVKIT_COVERAGE_USE_COUNT=1`）
 - `lib/validate_samples_tsv.sh`：严格校验输入 TSV
 - `lib/steps_cnvkit.sh`：封装 CNVkit 阶段一核心步骤
 - `01_submit_cnvkit_pipeline.sh`：阶段入口与 Slurm 提交

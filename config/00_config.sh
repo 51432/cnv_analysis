@@ -20,3 +20,6 @@ SLURM_PARTITION_DEFAULT="cpu1"
 SLURM_PARTITION_ALLOWED="cpu1 cpu2"
 SLURM_TIME_DEFAULT="24:00:00"
 SLURM_MEM_DEFAULT="16G"
+
+# Use count-based coverage to avoid samtools bedcov parse issues in some environments.
+CNVKIT_COVERAGE_USE_COUNT=1

@@ -30,6 +30,7 @@ samples_tsv=""
 stage="${CNVKIT_STAGE_DEFAULT}"
 mode="${CNVKIT_MODE_DEFAULT}"
 workdir="${PWD}/work/cnvkit"
+log_dir="${PWD}/logs"
 reference_out="${CNVKIT_REFERENCE_DEFAULT}"
 threads="${CNVKIT_THREADS_DEFAULT}"
 max_parallel="${CNVKIT_MAX_PARALLEL_DEFAULT}"
@@ -83,7 +84,7 @@ case "$stage" in
     ;;
 esac
 
-mkdir -p "$workdir" "$workdir/logs" "$workdir/meta" "$workdir/coverage"
+mkdir -p "$workdir" "$log_dir" "$workdir/meta" "$workdir/coverage"
 validated_samples="${workdir}/meta/samples.validated.tsv"
 normal_list="${workdir}/meta/normal_bams.unique.list"
 antitarget_bed="${workdir}/meta/antitarget.hg38.bed"
@@ -120,8 +121,8 @@ array_job_id=$(sbatch \
   "${common_sbatch_args[@]}" \
   --cpus-per-task="$threads" \
   --job-name=cnvkit_ref_cov \
-  --output="${workdir}/logs/cov_%A_%a.out" \
-  --error="${workdir}/logs/cov_%A_%a.err" \
+  --output="${log_dir}/cov_%A_%a.out" \
+  --error="${log_dir}/cov_%A_%a.err" \
   --array="$array_range" \
   --export=ALL,SCRIPT_DIR="$script_dir",NORMAL_LIST="$normal_list",COVERAGE_DIR="${workdir}/coverage",ANTITARGET_BED="$antitarget_bed",THREADS="$threads" \
   "${script_dir}/run_cnvkit_reference_array.sbatch")
@@ -134,12 +135,12 @@ build_job_id=$(sbatch \
   --dependency="afterok:${array_job_id}" \
   --kill-on-invalid-dep=yes \
   --job-name=cnvkit_ref_build \
-  --output="${workdir}/logs/build_%j.out" \
-  --error="${workdir}/logs/build_%j.err" \
+  --output="${log_dir}/build_%j.out" \
+  --error="${log_dir}/build_%j.err" \
   --export=ALL,SCRIPT_DIR="$script_dir",COVERAGE_DIR="${workdir}/coverage",REFERENCE_OUT="$reference_out",ANTITARGET_BED="$antitarget_bed",OVERWRITE_REFERENCE="$overwrite_reference" \
   "${script_dir}/02_build_cnvkit_reference.sh")
 
 echo "[INFO] Submitted reference build job: ${build_job_id}"
 echo "[INFO] Reference target path: ${reference_out}"
-echo "[INFO] If build job shows DependencyNeverSatisfied, check array logs: ${workdir}/logs/cov_<array_jobid>_<taskid>.err"
+echo "[INFO] If build job shows DependencyNeverSatisfied, check array logs: ${log_dir}/cov_<array_jobid>_<taskid>.err"
 echo "[INFO] Suggested check: sacct -j ${array_job_id} --format=JobID,State,ExitCode"

@@ -70,10 +70,10 @@ bash 01_submit_cnvkit_pipeline.sh \
 
 ## 日志与中间文件
 
-默认位于 `./work/cnvkit/`：
-- `meta/`：校验后样本表、去重 normal 列表、antitarget BED
-- `coverage/`：每个 normal 的 `.targetcoverage.cnn` 与 `.antitargetcoverage.cnn`
-- `logs/`：Slurm array 与汇总任务日志
+默认位于：
+- `./work/cnvkit/meta/`：校验后样本表、去重 normal 列表、antitarget BED
+- `./work/cnvkit/coverage/`：每个 normal 的 `.targetcoverage.cnn` 与 `.antitargetcoverage.cnn`
+- `./logs/`：Slurm array 与汇总任务日志（建立在当前目录）
 
 ## 常见问题
 
@@ -89,7 +89,7 @@ sacct -j <array_jobid> --format=JobID,State,ExitCode
 
 再查看对应日志：
 
-- `work/cnvkit/logs/cov_<array_jobid>_<taskid>.err`
-- `work/cnvkit/logs/cov_<array_jobid>_<taskid>.out`
+- `logs/cov_<array_jobid>_<taskid>.err`
+- `logs/cov_<array_jobid>_<taskid>.out`
 
 当前脚本已对 build job 使用 `--kill-on-invalid-dep=yes`，依赖无效时会自动取消，避免一直挂在队列中。

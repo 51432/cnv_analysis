@@ -9,7 +9,7 @@ usage() {
 Usage: $0 --samples <samples.tsv> [options]
 
 Options:
-  --samples <path>             samples.tsv path (required)
+  --samples <path>             samples.tsv path (required, TAB-delimited)
   --stage <name>               build-reference | run-cnv (default: ${CNVKIT_STAGE_DEFAULT})
   --mode <name>                wes only (default: ${CNVKIT_MODE_DEFAULT})
   --workdir <path>             work directory (default: ./work/cnvkit)
@@ -30,6 +30,7 @@ samples_tsv=""
 stage="${CNVKIT_STAGE_DEFAULT}"
 mode="${CNVKIT_MODE_DEFAULT}"
 workdir="${PWD}/work/cnvkit"
+log_dir="${PWD}/logs"
 reference_out="${CNVKIT_REFERENCE_DEFAULT}"
 threads="${CNVKIT_THREADS_DEFAULT}"
 max_parallel="${CNVKIT_MAX_PARALLEL_DEFAULT}"
@@ -83,10 +84,12 @@ case "$stage" in
     ;;
 esac
 
-mkdir -p "$workdir" "$workdir/logs" "$workdir/meta" "$workdir/coverage"
+mkdir -p "$workdir" "$log_dir" "$workdir/meta" "$workdir/coverage"
 validated_samples="${workdir}/meta/samples.validated.tsv"
 normal_list="${workdir}/meta/normal_bams.unique.list"
 antitarget_bed="${workdir}/meta/antitarget.hg38.bed"
+target_bed3="${workdir}/meta/target.hg38.bed3"
+antitarget_bed3="${workdir}/meta/antitarget.hg38.bed3"
 
 "${script_dir}/lib/validate_samples_tsv.sh" "$samples_tsv" "$validated_samples"
 
@@ -105,6 +108,9 @@ fi
 
 if [[ "$overwrite_reference" -eq 1 ]]; then
   rm -f "$reference_out"
+  rm -f "${workdir}/coverage"/*.cnn 2>/dev/null || true
+  rm -f "$target_bed3" "$antitarget_bed" "$antitarget_bed3"
+  echo "[INFO] overwrite mode: cleaned existing reference/coverage/meta BED cache"
 fi
 
 array_range="0-$((normal_count - 1))%${max_parallel}"
@@ -120,10 +126,10 @@ array_job_id=$(sbatch \
   "${common_sbatch_args[@]}" \
   --cpus-per-task="$threads" \
   --job-name=cnvkit_ref_cov \
-  --output="${workdir}/logs/cov_%A_%a.out" \
-  --error="${workdir}/logs/cov_%A_%a.err" \
+  --output="${log_dir}/cov_%A_%a.out" \
+  --error="${log_dir}/cov_%A_%a.err" \
   --array="$array_range" \
-  --export=ALL,SCRIPT_DIR="$script_dir",NORMAL_LIST="$normal_list",COVERAGE_DIR="${workdir}/coverage",ANTITARGET_BED="$antitarget_bed",THREADS="$threads" \
+  --export=ALL,SCRIPT_DIR="$script_dir",NORMAL_LIST="$normal_list",COVERAGE_DIR="${workdir}/coverage",ANTITARGET_BED="$antitarget_bed",TARGET_BED3="$target_bed3",ANTITARGET_BED3="$antitarget_bed3",THREADS="$threads" \
   "${script_dir}/run_cnvkit_reference_array.sbatch")
 
 echo "[INFO] Submitted coverage array job: ${array_job_id}"
@@ -132,11 +138,14 @@ build_job_id=$(sbatch \
   "${common_sbatch_args[@]}" \
   --cpus-per-task=1 \
   --dependency="afterok:${array_job_id}" \
+  --kill-on-invalid-dep=yes \
   --job-name=cnvkit_ref_build \
-  --output="${workdir}/logs/build_%j.out" \
-  --error="${workdir}/logs/build_%j.err" \
+  --output="${log_dir}/build_%j.out" \
+  --error="${log_dir}/build_%j.err" \
   --export=ALL,SCRIPT_DIR="$script_dir",COVERAGE_DIR="${workdir}/coverage",REFERENCE_OUT="$reference_out",ANTITARGET_BED="$antitarget_bed",OVERWRITE_REFERENCE="$overwrite_reference" \
   "${script_dir}/02_build_cnvkit_reference.sh")
 
 echo "[INFO] Submitted reference build job: ${build_job_id}"
 echo "[INFO] Reference target path: ${reference_out}"
+echo "[INFO] If build job shows DependencyNeverSatisfied, check array logs: ${log_dir}/cov_<array_jobid>_<taskid>.err"
+echo "[INFO] Suggested check: sacct -j ${array_job_id} --format=JobID,State,ExitCode"

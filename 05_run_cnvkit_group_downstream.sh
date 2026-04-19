@@ -16,6 +16,7 @@ Optional:
   --top-n <int>                Top N genes to visualize (default: 30)
   --gain-threshold <float>     Gain threshold on log2 when cn column is unavailable (default: 0.2)
   --loss-threshold <float>     Loss threshold on log2 when cn column is unavailable (default: -0.2)
+  --pathway-geneset <path>     Optional pathway geneset TSV: pathway<tab>gene
   -h, --help                   Show help
 USAGE
 }
@@ -26,6 +27,7 @@ output_dir=""
 top_n="30"
 gain_threshold="0.2"
 loss_threshold="-0.2"
+pathway_geneset=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -35,6 +37,7 @@ while [[ $# -gt 0 ]]; do
     --top-n) top_n="$2"; shift 2 ;;
     --gain-threshold) gain_threshold="$2"; shift 2 ;;
     --loss-threshold) loss_threshold="$2"; shift 2 ;;
+    --pathway-geneset) pathway_geneset="$2"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Unknown option: $1" >&2; usage; exit 1 ;;
   esac
@@ -56,6 +59,7 @@ python3 "$script_dir/scripts/cnvkit_group_downstream.py" \
   --output-dir "$output_dir" \
   --top-n "$top_n" \
   --gain-threshold "$gain_threshold" \
-  --loss-threshold "$loss_threshold"
+  --loss-threshold "$loss_threshold" \
+  --pathway-geneset "$pathway_geneset"
 
 echo "[INFO] Done. Output: $output_dir"

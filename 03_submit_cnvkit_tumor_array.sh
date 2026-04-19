@@ -77,9 +77,10 @@ esac
 
 mkdir -p "$output_root" "$log_dir" "$tmp_dir" "$output_root/meta"
 validated_samples="${output_root}/meta/samples.validated.tsv"
-target_bed3="${output_root}/meta/target.hg38.bed3"
 antitarget_bed="${output_root}/meta/antitarget.hg38.bed"
-antitarget_bed3="${output_root}/meta/antitarget.hg38.bed3"
+annotated_target_bed="${CNVKIT_ANNOTATED_TARGET_BED}"
+
+[[ -s "$annotated_target_bed" ]] || { echo "Missing annotated target BED: $annotated_target_bed" >&2; exit 1; }
 
 "${script_dir}/lib/validate_samples_tsv.sh" "$samples_tsv" "$validated_samples"
 sample_count=$(( $(wc -l < "$validated_samples") - 1 ))
@@ -100,7 +101,7 @@ array_job_id=$(sbatch \
   --output="${log_dir}/tumor_%A_%a.out" \
   --error="${log_dir}/tumor_%A_%a.err" \
   --array="$array_range" \
-  --export=ALL,SCRIPT_DIR="$script_dir",VALIDATED_SAMPLES="$validated_samples",OUTPUT_ROOT="$output_root",TMP_DIR="$tmp_dir",REFERENCE_CNN="$reference_cnn",STAGE="$stage",TARGET_BED3="$target_bed3",ANTITARGET_BED="$antitarget_bed",ANTITARGET_BED3="$antitarget_bed3",THREADS="$threads",ENABLE_FILTERING="$enable_filtering",ENABLE_GENEMETRICS="$enable_genemetrics",ENABLE_EXPORT="$enable_export",ENABLE_PLOTS="$enable_plots" \
+  --export=ALL,SCRIPT_DIR="$script_dir",VALIDATED_SAMPLES="$validated_samples",OUTPUT_ROOT="$output_root",TMP_DIR="$tmp_dir",REFERENCE_CNN="$reference_cnn",STAGE="$stage",ANNOTATED_TARGET_BED="$annotated_target_bed",ANTITARGET_BED="$antitarget_bed",THREADS="$threads",ENABLE_FILTERING="$enable_filtering",ENABLE_GENEMETRICS="$enable_genemetrics",ENABLE_EXPORT="$enable_export",ENABLE_PLOTS="$enable_plots" \
   "${script_dir}/run_cnvkit_tumor_array.sbatch")
 
 echo "[INFO] Submitted tumor array job: ${array_job_id}"

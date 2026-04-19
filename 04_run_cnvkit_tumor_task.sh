@@ -13,9 +13,8 @@ tumor_bam=""
 stage="all"
 output_root=""
 reference_cnn=""
-target_bed3=""
+annotated_target_bed=""
 antitarget_bed=""
-antitarget_bed3=""
 threads="1"
 enable_filtering=1
 enable_genemetrics=1
@@ -29,9 +28,8 @@ while [[ $# -gt 0 ]]; do
     --stage) stage="$2"; shift 2 ;;
     --output-root) output_root="$2"; shift 2 ;;
     --reference-cnn) reference_cnn="$2"; shift 2 ;;
-    --target-bed3) target_bed3="$2"; shift 2 ;;
+    --annotated-target-bed) annotated_target_bed="$2"; shift 2 ;;
     --antitarget-bed) antitarget_bed="$2"; shift 2 ;;
-    --antitarget-bed3) antitarget_bed3="$2"; shift 2 ;;
     --threads) threads="$2"; shift 2 ;;
     --enable-filtering) enable_filtering="$2"; shift 2 ;;
     --enable-genemetrics) enable_genemetrics="$2"; shift 2 ;;
@@ -42,6 +40,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 [[ -n "$sample_id" && -n "$tumor_bam" ]] || { echo "Missing sample info" >&2; exit 1; }
+[[ -s "$annotated_target_bed" ]] || { echo "[ERROR] Missing annotated target BED: $annotated_target_bed" >&2; exit 1; }
 
 sample_root="${output_root}/samples/${sample_id}"
 coverage_dir="${sample_root}/coverage"
@@ -53,9 +52,7 @@ export_dir="${sample_root}/export"
 plots_dir="${sample_root}/plots"
 mkdir -p "$coverage_dir" "$cnr_dir" "$cns_dir" "$call_dir" "$metrics_dir" "$export_dir" "$plots_dir"
 
-cnvkit_prepare_bed3 "$CNVKIT_TARGET_BED" "$target_bed3"
-cnvkit_build_antitarget_bed "$target_bed3" "$CNVKIT_ACCESS_BED" "$antitarget_bed"
-cnvkit_prepare_bed3 "$antitarget_bed" "$antitarget_bed3"
+cnvkit_build_antitarget_bed "$annotated_target_bed" "$CNVKIT_ACCESS_BED" "$antitarget_bed"
 
 need_fix=0
 need_segment=0
@@ -71,7 +68,7 @@ case "$stage" in
   *) echo "Unsupported stage: $stage" >&2; exit 1 ;;
 esac
 
-cnvkit_run_tumor_coverage "$sample_id" "$tumor_bam" "$target_bed3" "$antitarget_bed3" "$coverage_dir"
+cnvkit_run_tumor_coverage "$sample_id" "$tumor_bam" "$annotated_target_bed" "$antitarget_bed" "$coverage_dir"
 
 if [[ "$need_fix" -eq 1 ]]; then
   cnvkit_run_fix "$sample_id" "$coverage_dir" "$reference_cnn" "$cnr_dir"

@@ -52,6 +52,9 @@ bash 01_submit_cnvkit_pipeline.sh   --samples samples.tsv   --stage build-refere
 
 ## 阶段二：tumor CNV 分析（新增）
 
+> 说明：pipeline 现在直接使用带基因注释的 target BED（4列），不再生成或校验原始 3 列 BED。
+
+
 入口脚本：`03_submit_cnvkit_tumor_array.sh`
 
 ### 主链步骤
@@ -160,7 +163,7 @@ bash 03_submit_cnvkit_tumor_array.sh \
 
 统一管理：
 - `CNVKIT_REFERENCE_DEFAULT`
-- `CNVKIT_TARGET_BED`
+- `CNVKIT_ANNOTATED_TARGET_BED`
 - `CNVKIT_ACCESS_BED`
 - `REFERENCE`
 - `CNVKIT_CMD`

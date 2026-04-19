@@ -3,6 +3,8 @@ set -euo pipefail
 
 : "${SCRIPT_DIR:?missing SCRIPT_DIR}"
 : "${VALIDATED_SAMPLES:?missing VALIDATED_SAMPLES}"
+: "${ANNOTATED_TARGET_BED:?missing ANNOTATED_TARGET_BED}"
+: "${ANTITARGET_BED:?missing ANTITARGET_BED}"
 
 line_no="$((SLURM_ARRAY_TASK_ID + 2))"
 line="$(sed -n "${line_no}p" "$VALIDATED_SAMPLES")"
@@ -16,9 +18,8 @@ IFS=$'\t' read -r sample_id tumor_bam normal_bam <<< "$line"
   --stage "$STAGE" \
   --output-root "$OUTPUT_ROOT" \
   --reference-cnn "$REFERENCE_CNN" \
-  --target-bed3 "$TARGET_BED3" \
+  --annotated-target-bed "$ANNOTATED_TARGET_BED" \
   --antitarget-bed "$ANTITARGET_BED" \
-  --antitarget-bed3 "$ANTITARGET_BED3" \
   --threads "$THREADS" \
   --enable-filtering "$ENABLE_FILTERING" \
   --enable-genemetrics "$ENABLE_GENEMETRICS" \

@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+script_dir="${SCRIPT_DIR:-}"
+if [[ -z "$script_dir" ]]; then
+  script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+fi
+
 source "${script_dir}/config/00_config.sh"
 source "${script_dir}/lib/steps_cnvkit.sh"
 

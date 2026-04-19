@@ -103,3 +103,13 @@ sacct -j <array_jobid> --format=JobID,State,ExitCode
 这通常是 BED 列数不一致导致（例如目标区间文件中混有 3/4 列），CNVkit 在并行 coverage 解析时会报错。
 
 当前脚本会在任务开始时把 target/antitarget 统一规范成 BED3（仅 chrom/start/end 三列），以避免该问题。
+
+### `config/00_config.sh: No such file or directory`（build job）
+
+如果 `build_*.err` 出现类似：
+
+```text
+/var/spool/slurmd/jobXXXX/slurm_script: ... config/00_config.sh: No such file or directory
+```
+
+说明 Slurm 在 spool 目录执行脚本，不能依赖脚本自身相对路径。当前版本已优先使用提交时导出的 `SCRIPT_DIR` 来定位项目目录。

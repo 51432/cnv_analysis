@@ -33,7 +33,7 @@ bash 01_submit_cnvkit_pipeline.sh \
 可选参数：
 - `--reference-out`：指定 reference 输出路径。
 - `--workdir`：指定中间目录与日志目录。
-- `--overwrite-reference`：如果 reference 已存在则强制重建。
+- `--overwrite-reference`：如果 reference 已存在则强制重建（并清理已有 `.cnn` 与 BED 缓存后重跑）。
 - `--partition` / `SLURM_PARTITION`：仅允许 `cpu1` 或 `cpu2`，默认 `cpu1`。
 
 ## 阶段一执行顺序
@@ -54,6 +54,8 @@ bash 01_submit_cnvkit_pipeline.sh \
    - 汇总所有 coverage `.cnn` 文件生成 pooled reference
 
 ## 关键 CNVkit 子命令
+
+> 说明：为避免部分环境下 `cnvkit.py coverage` 并行解析 BED 出现 `ParserError`，脚本内部固定使用 `-p 1`；并发主要通过 Slurm array (`--max-parallel`) 实现。
 
 - `cnvkit.py antitarget`
 - `cnvkit.py coverage`

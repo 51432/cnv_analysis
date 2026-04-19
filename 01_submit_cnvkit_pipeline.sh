@@ -108,6 +108,9 @@ fi
 
 if [[ "$overwrite_reference" -eq 1 ]]; then
   rm -f "$reference_out"
+  rm -f "${workdir}/coverage"/*.cnn 2>/dev/null || true
+  rm -f "$target_bed3" "$antitarget_bed" "$antitarget_bed3"
+  echo "[INFO] overwrite mode: cleaned existing reference/coverage/meta BED cache"
 fi
 
 array_range="0-$((normal_count - 1))%${max_parallel}"

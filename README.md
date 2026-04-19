@@ -125,6 +125,100 @@ bash 01_submit_cnvkit_pipeline.sh   --samples samples.tsv   --stage build-refere
 
 ---
 
+## 阶段 2 输出结果说明（给新手）
+
+下面这节专门解释阶段 2 每个样本目录里“文件是干什么的、先看什么、后看什么”。
+
+示例目录：
+
+```text
+work/cnvkit_tumor/samples/TSDE014/
+  call/
+  cnr/
+  cns/
+  coverage/
+  export/
+  metrics/
+  plots/
+```
+
+### 1）每个子目录的作用
+
+- `coverage/`
+  - 覆盖度中间结果（target + antitarget），主要用于 `fix` 生成 `.cnr`。
+  - 一般不是人工解读 CNV 的第一选择，但用于排查流程是否跑通很有用。
+- `cnr/`
+  - bin-level（窗口级）log2 信号文件，分辨率高但噪声也更高。
+  - 适合深度排查和自定义重分段，不是新手首选结果文件。
+- `cns/`
+  - 分段结果（segment-level），是“原始分段”主结果之一。
+  - 适合看样本整体 CNV 结构，也常用于 burden / arm-level 统计。
+- `call/`
+  - 在分段基础上做了 calling/filtering 后的结果（如 `--filter ci`）。
+  - 更适合做“保守版”事件列表展示，但可能比 `cns/` 更粗。
+- `metrics/`
+  - 统计摘要结果目录，常见有 `segmetrics` 和 `genemetrics`。
+  - 尤其 `genemetrics.tsv` 很适合 gene-level 汇总分析。
+- `export/`
+  - 为其他软件或下游模块导出的交换格式（SEG/BED/VCF）。
+  - 常用于跨工具对接，不是最先看的主结果。
+- `plots/`
+  - CNVkit 自动生成的可视化（scatter/diagram）。
+  - 最适合人工质控和快速浏览样本 CNV 全貌。
+
+### 2）典型文件说明（按常见使用场景）
+
+- `coverage/*.targetcoverage.cnn`
+  - 靶区覆盖度；`fix` 的输入之一。
+- `coverage/*.antitargetcoverage.cnn`
+  - 非靶区（背景）覆盖度；`fix` 的输入之一。
+- `cnr/*.cnr`
+  - 每个 bin 的归一化 log2 值，后续 `segment` 的直接输入。
+- `cns/*.seg.cns`
+  - 分段输出（未 calling 的主分段）；适合查看原始分段结构。
+- `call/*.call.cns`
+  - calling 后分段（可能更保守/更粗）；适合看“过滤后高置信事件”。
+- `metrics/*.genemetrics.tsv`
+  - gene 维度统计；做 gene-level CNV 统计/比较时优先参考。
+- `export/*.seg`
+  - SEG 交换格式，常给 IGV/GISTIC 等工具或下游流程使用。
+- `export/*.bed`
+  - BED 区间格式，便于区间类工具处理。
+- `export/*.vcf`
+  - VCF 表达的 CNV 事件，便于与变异流程或注释流程衔接。
+- `plots/*.scatter.pdf`
+  - 全基因组散点 + 分段图；最常用的人工 QC 图之一。
+- `plots/*.diagram.pdf`
+  - 染色体示意图（CNV diagram）；适合快速看大片段扩增/缺失模式。
+
+### 3）“看哪类问题用哪类文件”快速对照
+
+- 想看**原始分段结果**：
+  - 优先 `cns/*.seg.cns`（分段细节更完整）。
+- 想做 **gene-level 统计**：
+  - 优先 `metrics/*.genemetrics.tsv`；
+  - 无该文件时可用 `call/*.call.cns` 或 `cns/*.seg.cns` 映射到基因。
+- 想做 **burden / arm-level 分析**：
+  - 通常优先 `cns/*.seg.cns`（分段更细，长度统计更稳定）；
+  - 若只关心高置信事件，也可用 `call/*.call.cns` 做更保守分析。
+- 需要给**其他软件/下游工具**：
+  - 使用 `export/*.seg`、`export/*.bed`、`export/*.vcf`。
+- 做**人工质控（QC）**：
+  - 优先看 `plots/*.scatter.pdf` 和 `plots/*.diagram.pdf`。
+
+### 4）新手如何看结果（推荐顺序）
+
+1. **先看 `plots/`**  
+   先用 `scatter.pdf` / `diagram.pdf` 快速判断样本是否有明显 CNV 模式、是否存在异常噪声。
+2. **再看 `cns/`**  
+   读取 `*.seg.cns` 看原始分段是否合理（是否出现连续大片段 gain/loss、是否过度碎片化）。
+3. **然后看 `call/` 和 `metrics/`**  
+   用 `*.call.cns` 看过滤后的高置信事件；用 `*.genemetrics.tsv` 做基因层面解释与汇总。
+4. **最后再看 `export/`**  
+   `export/` 更偏“对接其他工具”的交换格式，不建议作为第一主结果入口。
+
+---
+
 ## 最小运行示例
 
 ### 只跑主链到 segment

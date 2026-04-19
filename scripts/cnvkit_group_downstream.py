@@ -3,7 +3,6 @@ import argparse
 import math
 from pathlib import Path
 
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from scipy.stats import chi2_contingency, fisher_exact, kruskal, mannwhitneyu
@@ -60,15 +59,16 @@ def read_group_table(group_tsv):
     return group_df, groups
 
 
-def locate_sample_file(cnvkit_root: Path, sample_id: str):
+def locate_sample_files(cnvkit_root: Path, sample_id: str):
     sample_dir = cnvkit_root / "samples" / sample_id
     call_file = sample_dir / "call" / f"{sample_id}.call.cns"
     seg_file = sample_dir / "cns" / f"{sample_id}.seg.cns"
-    if call_file.exists() and call_file.stat().st_size > 0:
-        return call_file
-    if seg_file.exists() and seg_file.stat().st_size > 0:
-        return seg_file
-    return None
+    gene_file = sample_dir / "metrics" / f"{sample_id}.genemetrics.tsv"
+    return {
+        "call_cns": call_file if call_file.exists() and call_file.stat().st_size > 0 else None,
+        "seg_cns": seg_file if seg_file.exists() and seg_file.stat().st_size > 0 else None,
+        "genemetrics": gene_file if gene_file.exists() and gene_file.stat().st_size > 0 else None,
+    }
 
 
 def classify_state(row, gain_thr, loss_thr):
@@ -98,6 +98,22 @@ def split_genes(gene_field):
     return genes
 
 
+def classify_state_from_dict(row_dict, gain_thr, loss_thr):
+    if "cn" in row_dict and not pd.isna(row_dict["cn"]):
+        cn = row_dict["cn"]
+        if cn > 2:
+            return 1
+        if cn < 2:
+            return -1
+        return 0
+    log2 = row_dict.get("log2", 0.0)
+    if log2 >= gain_thr:
+        return 1
+    if log2 <= loss_thr:
+        return -1
+    return 0
+
+
 def build_sample_metrics(cnv_df):
     lengths = (cnv_df["end"] - cnv_df["start"]).astype(float)
     gain = cnv_df["state"] == 1
@@ -112,6 +128,49 @@ def build_sample_metrics(cnv_df):
         "loss_total_length": float(lengths[loss].sum()),
         "altered_genome_fraction": float(altered_len / total_len) if total_len > 0 else math.nan,
     }
+
+
+def read_cns_with_state(cns_file: Path, gain_thr: float, loss_thr: float):
+    cns = pd.read_csv(cns_file, sep="\t", comment="#")
+    required_cols = {"chromosome", "start", "end", "gene", "log2"}
+    if not required_cols.issubset(cns.columns):
+        raise ValueError(f"{cns_file} missing required columns: {required_cols}")
+    cns = cns.copy()
+    cns["state"] = cns.apply(classify_state, axis=1, gain_thr=gain_thr, loss_thr=loss_thr)
+    return cns
+
+
+def gene_state_from_genemetrics(gene_file: Path, gain_thr: float, loss_thr: float):
+    gm = pd.read_csv(gene_file, sep="\t", comment="#")
+    if "gene" not in gm.columns:
+        raise ValueError(f"{gene_file} missing required column: gene")
+    if "cn" not in gm.columns and "log2" not in gm.columns:
+        raise ValueError(f"{gene_file} must contain cn or log2 column")
+    gene_state = {}
+    for _, row in gm.iterrows():
+        gene_name = row.get("gene")
+        if pd.isna(gene_name) or str(gene_name).strip() in ("", "."):
+            continue
+        state = classify_state_from_dict(row.to_dict(), gain_thr=gain_thr, loss_thr=loss_thr)
+        if state == 0:
+            continue
+        prev = gene_state.get(str(gene_name), 0)
+        if abs(state) >= abs(prev):
+            gene_state[str(gene_name)] = state
+    return gene_state
+
+
+def gene_state_from_cns(cns_df):
+    gene_state = {}
+    for _, row in cns_df.iterrows():
+        state = int(row["state"])
+        if state == 0:
+            continue
+        for gene in split_genes(row["gene"]):
+            prev = gene_state.get(gene, 0)
+            if abs(state) >= abs(prev):
+                gene_state[gene] = state
+    return gene_state
 
 
 def infer_arm(row, chr_max_end):
@@ -179,6 +238,8 @@ def build_frequency_table(matrix_df, group_map, groups, feature_col="feature"):
 
 
 def draw_burden_boxplots(burden_df, outdir: Path):
+    import matplotlib.pyplot as plt
+
     fig, axes = plt.subplots(2, 3, figsize=(14, 8))
     axes = axes.ravel()
     for i, metric in enumerate(BURDEN_METRICS):
@@ -212,6 +273,8 @@ def draw_burden_boxplots(burden_df, outdir: Path):
 
 
 def draw_gene_frequency_barplot(freq_df, top_genes, outdir: Path):
+    import matplotlib.pyplot as plt
+
     plot_df = freq_df[freq_df["gene"].isin(top_genes)].copy()
     plot_df["gene"] = pd.Categorical(plot_df["gene"], categories=top_genes, ordered=True)
     pivot = plot_df.pivot(index="gene", columns="group", values="frequency").fillna(0.0)
@@ -226,6 +289,8 @@ def draw_gene_frequency_barplot(freq_df, top_genes, outdir: Path):
 
 
 def draw_gene_heatmap(gene_matrix, sample_order, top_genes, outdir: Path):
+    import matplotlib.pyplot as plt
+
     sub = gene_matrix.set_index("gene").loc[top_genes, sample_order]
     fig, ax = plt.subplots(figsize=(max(10, len(sample_order) * 0.35), max(6, len(top_genes) * 0.22)))
     im = ax.imshow(sub.values, aspect="auto", cmap="bwr", vmin=-1, vmax=1)
@@ -242,6 +307,8 @@ def draw_gene_heatmap(gene_matrix, sample_order, top_genes, outdir: Path):
 
 
 def draw_arm_heatmap(arm_matrix, sample_order, outdir: Path, top_n=40):
+    import matplotlib.pyplot as plt
+
     arm_score = (arm_matrix.drop(columns=["arm"]) != 0).sum(axis=1)
     keep_arms = arm_matrix.loc[arm_score.sort_values(ascending=False).index[:top_n], "arm"].tolist()
     if not keep_arms:
@@ -274,34 +341,35 @@ def main():
     gene_state_by_sample = {}
     arm_state_by_sample = {}
     missing = []
+    source_rows = []
 
     for sample_id in group_df["sample_id"]:
-        sample_file = locate_sample_file(cnvkit_root, sample_id)
-        if sample_file is None:
+        sample_files = locate_sample_files(cnvkit_root, sample_id)
+
+        burden_cns_file = sample_files["seg_cns"] or sample_files["call_cns"]
+        if burden_cns_file is None:
             missing.append(sample_id)
             continue
-        cns = pd.read_csv(sample_file, sep="\t", comment="#")
-        required_cols = {"chromosome", "start", "end", "gene", "log2"}
-        if not required_cols.issubset(cns.columns):
-            raise ValueError(f"{sample_file} missing required columns: {required_cols}")
-
-        cns = cns.copy()
-        cns["state"] = cns.apply(classify_state, axis=1, gain_thr=args.gain_threshold, loss_thr=args.loss_threshold)
+        cns = read_cns_with_state(burden_cns_file, gain_thr=args.gain_threshold, loss_thr=args.loss_threshold)
 
         metrics = build_sample_metrics(cns)
         metrics["sample_id"] = sample_id
         metrics["group"] = group_map[sample_id]
         burden_rows.append(metrics)
 
-        gene_state = {}
-        for _, row in cns.iterrows():
-            state = int(row["state"])
-            if state == 0:
-                continue
-            for gene in split_genes(row["gene"]):
-                prev = gene_state.get(gene, 0)
-                if abs(state) >= abs(prev):
-                    gene_state[gene] = state
+        gene_source = ""
+        if sample_files["genemetrics"] is not None:
+            gene_state = gene_state_from_genemetrics(
+                sample_files["genemetrics"], gain_thr=args.gain_threshold, loss_thr=args.loss_threshold
+            )
+            gene_source = "genemetrics"
+        elif sample_files["call_cns"] is not None:
+            call_cns = read_cns_with_state(sample_files["call_cns"], gain_thr=args.gain_threshold, loss_thr=args.loss_threshold)
+            gene_state = gene_state_from_cns(call_cns)
+            gene_source = "call_cns"
+        else:
+            gene_state = gene_state_from_cns(cns)
+            gene_source = "seg_cns"
         gene_state_by_sample[sample_id] = gene_state
 
         chr_max_end = cns.groupby("chromosome")["end"].max().to_dict()
@@ -315,6 +383,14 @@ def main():
             if abs(state) >= abs(prev):
                 arm_state[arm] = state
         arm_state_by_sample[sample_id] = arm_state
+        source_rows.append(
+            {
+                "sample_id": sample_id,
+                "group": group_map[sample_id],
+                "burden_source": "seg_cns" if sample_files["seg_cns"] is not None else "call_cns",
+                "gene_source": gene_source,
+            }
+        )
 
     if missing:
         raise FileNotFoundError(f"Missing CNV files for samples: {', '.join(missing)}")
@@ -363,6 +439,9 @@ def main():
 
     if len(all_arms) > 0:
         draw_arm_heatmap(arm_matrix, sample_order, outdir, top_n=min(args.top_n, len(all_arms)))
+
+    source_df = pd.DataFrame(source_rows).sort_values(["group", "sample_id"])
+    source_df.to_csv(outdir / "data_source_by_sample.tsv", sep="\t", index=False)
 
     summary = {
         "group_count": len(groups),

@@ -199,7 +199,8 @@ scripts/
 
 1. `--cnvkit-root`
    - CNVkit 主流程输出根目录，内部需包含：`samples/<sample_id>/...`
-   - 脚本优先读取 `call/<sample_id>.call.cns`，若不存在则回退到 `cns/<sample_id>.seg.cns`
+   - burden 统计优先读取 `cns/<sample_id>.seg.cns`（分段更细）；若不存在则回退 `call/<sample_id>.call.cns`
+   - gene matrix 优先读取 `metrics/<sample_id>.genemetrics.tsv`；若缺失则回退 `call/<sample_id>.call.cns`，再回退 `cns/<sample_id>.seg.cns`
 2. `--group-tsv`
    - 必须为 TAB 分隔，表头固定：
    - `sample_id<TAB>group`
@@ -218,6 +219,7 @@ scripts/
 - `arm_level_cnv_matrix.tsv`
 - `arm_level_frequency_comparison.tsv`
 - `run_summary.tsv`
+- `data_source_by_sample.tsv`
 
 图片：
 - `burden_boxplot.pdf`

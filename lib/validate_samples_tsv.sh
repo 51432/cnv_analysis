@@ -33,12 +33,23 @@ declare -A seen_sample_ids=()
 error_count=0
 line_no=1
 
-while IFS=$'\t' read -r sample_id tumor_bam normal_bam extra || [[ -n "${sample_id:-}" || -n "${tumor_bam:-}" || -n "${normal_bam:-}" || -n "${extra:-}" ]]; do
+while IFS= read -r raw_line || [[ -n "$raw_line" ]]; do
   ((line_no += 1))
 
-  if [[ -n "${extra:-}" || -z "${sample_id:-}" || -z "${tumor_bam:-}" || -z "${normal_bam:-}" ]]; then
+  tab_count="$(awk -F'\t' '{print NF-1}' <<< "$raw_line")"
+  if [[ "$tab_count" -ne 2 ]]; then
+    sid="$(cut -f1 <<< "$raw_line")"
+    sid="${sid:-NA}"
+    echo "[ERROR] line=${line_no} sample_id=${sid} message=row must be TAB-delimited with exactly 3 columns" >&2
+    ((error_count += 1))
+    continue
+  fi
+
+  IFS=$'\t' read -r sample_id tumor_bam normal_bam <<< "$raw_line"
+
+  if [[ -z "${sample_id:-}" || -z "${tumor_bam:-}" || -z "${normal_bam:-}" ]]; then
     sid="${sample_id:-NA}"
-    echo "[ERROR] line=${line_no} sample_id=${sid} message=each row must contain exactly 3 tab-separated columns" >&2
+    echo "[ERROR] line=${line_no} sample_id=${sid} message=each row must contain non-empty sample_id/tumor_bam/normal_bam" >&2
     ((error_count += 1))
     continue
   fi

@@ -15,6 +15,8 @@ CNVKIT_THREADS_DEFAULT=8
 CNVKIT_MAX_PARALLEL_DEFAULT=8
 
 # Slurm defaults (can be overridden via environment variables before submission).
-SLURM_PARTITION_DEFAULT="compute"
+# Partition is restricted to cpu1/cpu2 in this project.
+SLURM_PARTITION_DEFAULT="cpu1"
+SLURM_PARTITION_ALLOWED="cpu1 cpu2"
 SLURM_TIME_DEFAULT="24:00:00"
-SLURM_MEM_DEFAULT="16G"
+SLURM_MEM_DEFAULT=32G"

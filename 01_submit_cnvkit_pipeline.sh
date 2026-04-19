@@ -16,10 +16,12 @@ Options:
   --reference-out <path>       pooled reference output path (default: ${CNVKIT_REFERENCE_DEFAULT})
   --threads <int>              CNVkit threads for each array task (default: ${CNVKIT_THREADS_DEFAULT})
   --max-parallel <int>         Slurm array concurrency cap (default: ${CNVKIT_MAX_PARALLEL_DEFAULT})
+  --partition <name>           Slurm partition, only cpu1 or cpu2 (default: ${SLURM_PARTITION_DEFAULT})
   --overwrite-reference        overwrite existing pooled reference
 
 Environment overrides:
-  SLURM_PARTITION / SLURM_TIME / SLURM_MEM
+  SLURM_PARTITION              optional override (allowed: cpu1/cpu2)
+  SLURM_TIME / SLURM_MEM
   -h, --help                   show help
 USAGE
 }
@@ -45,6 +47,7 @@ while [[ $# -gt 0 ]]; do
     --reference-out) reference_out="$2"; shift 2 ;;
     --threads) threads="$2"; shift 2 ;;
     --max-parallel) max_parallel="$2"; shift 2 ;;
+    --partition) slurm_partition="$2"; shift 2 ;;
     --overwrite-reference) overwrite_reference=1; shift ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Unknown option: $1" >&2; usage; exit 1 ;;
@@ -59,6 +62,11 @@ fi
 
 if [[ "$mode" != "wes" ]]; then
   echo "Only --mode wes is supported now." >&2
+  exit 1
+fi
+
+if [[ " ${SLURM_PARTITION_ALLOWED} " != *" ${slurm_partition} "* ]]; then
+  echo "Unsupported partition: ${slurm_partition}. Allowed: ${SLURM_PARTITION_ALLOWED}" >&2
   exit 1
 fi
 
@@ -101,11 +109,15 @@ fi
 
 array_range="0-$((normal_count - 1))%${max_parallel}"
 
+common_sbatch_args=(
+  --parsable
+  --partition="$slurm_partition"
+  --time="$slurm_time"
+  --mem="$slurm_mem"
+)
+
 array_job_id=$(sbatch \
-  --parsable \
-  --partition="$slurm_partition" \
-  --time="$slurm_time" \
-  --mem="$slurm_mem" \
+  "${common_sbatch_args[@]}" \
   --cpus-per-task="$threads" \
   --job-name=cnvkit_ref_cov \
   --output="${workdir}/logs/cov_%A_%a.out" \
@@ -117,10 +129,7 @@ array_job_id=$(sbatch \
 echo "[INFO] Submitted coverage array job: ${array_job_id}"
 
 build_job_id=$(sbatch \
-  --parsable \
-  --partition="$slurm_partition" \
-  --time="$slurm_time" \
-  --mem="$slurm_mem" \
+  "${common_sbatch_args[@]}" \
   --cpus-per-task=1 \
   --dependency="afterok:${array_job_id}" \
   --job-name=cnvkit_ref_build \

@@ -9,7 +9,7 @@
 
 ## 输入格式
 
-`samples.tsv` 表头必须严格为：
+`samples.tsv` 必须为 **TAB 分隔**，且表头必须严格为：
 
 ```tsv
 sample_id	tumor_bam	normal_bam
@@ -34,6 +34,7 @@ bash 01_submit_cnvkit_pipeline.sh \
 - `--reference-out`：指定 reference 输出路径。
 - `--workdir`：指定中间目录与日志目录。
 - `--overwrite-reference`：如果 reference 已存在则强制重建。
+- `--partition` / `SLURM_PARTITION`：仅允许 `cpu1` 或 `cpu2`，默认 `cpu1`。
 
 ## 阶段一执行顺序
 

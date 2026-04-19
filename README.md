@@ -47,7 +47,8 @@ bash 01_submit_cnvkit_pipeline.sh \
    - 根据数组索引取 1 个 unique normal BAM
    - 调用单任务脚本
 3. `02_run_cnvkit_reference_task.sh`
-   - 生成 antitarget BED（存在则跳过）
+   - 先将 target BED 规范化为 BED3（仅前3列）
+   - 生成 antitarget BED（存在则跳过），再规范化为 BED3
    - 计算 target/antitarget coverage（存在则跳过）
 4. `02_build_cnvkit_reference.sh`
    - 汇总所有 coverage `.cnn` 文件生成 pooled reference
@@ -93,3 +94,10 @@ sacct -j <array_jobid> --format=JobID,State,ExitCode
 - `logs/cov_<array_jobid>_<taskid>.out`
 
 当前脚本已对 build job 使用 `--kill-on-invalid-dep=yes`，依赖无效时会自动取消，避免一直挂在队列中。
+
+
+### `ParserError: expected 5 and found 4` 是什么？
+
+这通常是 BED 列数不一致导致（例如目标区间文件中混有 3/4 列），CNVkit 在并行 coverage 解析时会报错。
+
+当前脚本会在任务开始时把 target/antitarget 统一规范成 BED3（仅 chrom/start/end 三列），以避免该问题。

@@ -88,6 +88,8 @@ mkdir -p "$workdir" "$log_dir" "$workdir/meta" "$workdir/coverage"
 validated_samples="${workdir}/meta/samples.validated.tsv"
 normal_list="${workdir}/meta/normal_bams.unique.list"
 antitarget_bed="${workdir}/meta/antitarget.hg38.bed"
+target_bed3="${workdir}/meta/target.hg38.bed3"
+antitarget_bed3="${workdir}/meta/antitarget.hg38.bed3"
 
 "${script_dir}/lib/validate_samples_tsv.sh" "$samples_tsv" "$validated_samples"
 
@@ -124,7 +126,7 @@ array_job_id=$(sbatch \
   --output="${log_dir}/cov_%A_%a.out" \
   --error="${log_dir}/cov_%A_%a.err" \
   --array="$array_range" \
-  --export=ALL,SCRIPT_DIR="$script_dir",NORMAL_LIST="$normal_list",COVERAGE_DIR="${workdir}/coverage",ANTITARGET_BED="$antitarget_bed",THREADS="$threads" \
+  --export=ALL,SCRIPT_DIR="$script_dir",NORMAL_LIST="$normal_list",COVERAGE_DIR="${workdir}/coverage",ANTITARGET_BED="$antitarget_bed",TARGET_BED3="$target_bed3",ANTITARGET_BED3="$antitarget_bed3",THREADS="$threads" \
   "${script_dir}/run_cnvkit_reference_array.sbatch")
 
 echo "[INFO] Submitted coverage array job: ${array_job_id}"

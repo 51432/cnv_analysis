@@ -1,6 +1,21 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+cnvkit_prepare_bed3() {
+  local input_bed="$1"
+  local output_bed="$2"
+
+  mkdir -p "$(dirname "$output_bed")"
+  if [[ -s "$output_bed" ]]; then
+    echo "[INFO] BED3 exists, skip: $output_bed"
+    return 0
+  fi
+
+  # Keep first 3 columns only, ignore track/browser/comment lines.
+  awk 'BEGIN{FS=OFS="\t"} $0 !~ /^#/ && $0 !~ /^track/ && $0 !~ /^browser/ {if (NF<3) {exit 2}; print $1,$2,$3}' "$input_bed" > "$output_bed"
+  echo "[INFO] Prepared BED3: $output_bed"
+}
+
 cnvkit_build_antitarget_bed() {
   local target_bed="$1"
   local access_bed="$2"

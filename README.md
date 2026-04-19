@@ -28,11 +28,24 @@ sample_id	tumor_bam	normal_bam
 
 ---
 
-## 阶段一：build reference
+## 阶段一：build reference（完整指令）
 
 入口脚本：`01_submit_cnvkit_pipeline.sh`
 
-> 可直接使用现成 reference：
+如果你还没有 reference，可运行：
+
+```bash
+bash 01_submit_cnvkit_pipeline.sh   --samples samples.tsv   --stage build-reference   --mode wes   --threads 8   --max-parallel 8   --reference-out /data/person/wup/public/liusy_files/reference_genomes/hg38/resources/cnvkit/wes_reference.cnn
+```
+
+常用可选参数：
+- `--workdir`：阶段一中间目录（默认 `./work/cnvkit`）
+- `--overwrite-reference`：强制重建 reference（会清理 reference/coverage/BED 缓存）
+- `--partition`：`cpu1` 或 `cpu2`
+- 环境变量可覆盖 Slurm 资源：`SLURM_TIME`、`SLURM_MEM`
+
+如果 reference 已存在并且你想直接复用，可使用：
+
 > `/data/person/wup/public/liusy_files/reference_genomes/hg38/resources/cnvkit/wes_reference.cnn`
 
 ---

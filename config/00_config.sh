@@ -2,7 +2,7 @@
 
 # CNVkit WES pipeline shared configuration.
 REFERENCE="/data/person/wup/public/liusy_files/reference_genomes/hg38/reference/Homo_sapiens_assembly38.fasta"
-CNVKIT_TARGET_BED="/data/person/wup/public/liusy_files/reference_genomes/hg38/intervals/UCSC_Agilent_exome_regions.hg38.bed"
+CNVKIT_TARGET_BED="/data/person/wup/public/liusy_files/reference_genomes/hg38/intervals/AgilentSureSelectV5/UCSC_Agilent_exome_regions.hg38.bed"
 CNVKIT_ACCESS_BED="/data/person/wup/public/liusy_files/reference_genomes/hg38/resources/access.hg38.bed"
 
 # Recommended project-level CNVkit pooled-normal reference path.

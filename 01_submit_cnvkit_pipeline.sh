@@ -9,7 +9,7 @@ usage() {
 Usage: $0 --samples <samples.tsv> [options]
 
 Options:
-  --samples <path>             samples.tsv path (required, TAB-delimited)
+  --samples <path>             samples.tsv path (required)
   --stage <name>               build-reference | run-cnv (default: ${CNVKIT_STAGE_DEFAULT})
   --mode <name>                wes only (default: ${CNVKIT_MODE_DEFAULT})
   --workdir <path>             work directory (default: ./work/cnvkit)

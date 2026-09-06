@@ -35,6 +35,7 @@ sample_id	tumor_bam	normal_bam
 如果你还没有 reference，可运行：
 
 ```bash
+cd ./wgs/scripts/cnvkit/work
 bash 01_submit_cnvkit_pipeline.sh   --samples samples.tsv   --stage build-reference   --mode wes   --threads 8   --max-parallel 8   --reference-out /data/person/wup/public/liusy_files/reference_genomes/hg38/resources/cnvkit/wes_reference.cnn
 ```
 
